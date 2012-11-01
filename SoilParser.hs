@@ -11,7 +11,7 @@ import Data.Char(isSpace,isLower,isUpper,isDigit,isAlpha,isAlphaNum)
 
 keyWords = ["self", "to", "create", "with", "become", 
             "let", "from", "case", "send", "concat",
-            "if", "then", "else"]
+            "if", "then", "else", "end"]
 
 digit :: Parser Char
 digit = satisfy isDigit
@@ -97,13 +97,13 @@ actops = token $ many actop
 
 someparams :: Parser [Name]
 someparams = token $ some
-             where some = do s <- name `sepBy1` (schar ',')
+             where some = do s <- name `sepBy` (schar ',')
                              return s
 
-parameters :: Parser [[Name]]
-parameters = token $ many someparams
+parameters :: Parser [Name]
+parameters = token $ someparams
 
--- partial Expr parser
+
 expr :: Parser Expr
 expr = token $ case' <|> ifStm <|> acts
         where case' = do symbol "case"
@@ -129,7 +129,7 @@ expr = token $ case' <|> ifStm <|> acts
 cases :: Parser ([([Name], Expr)], Expr)
 cases = token $ parCase <|> restCase
         where parCase = do schar '('
-                           [n] <- parameters
+                           n <- parameters
                            schar ')'
                            schar ':'
                            e1 <- expr
@@ -141,6 +141,28 @@ cases = token $ parCase <|> restCase
                             return ([], e)     
 
 
+fundef :: Parser Func
+fundef = token $ do symbol "let"
+                    i <- ident
+                    schar '('
+                    p <- parameters
+                    schar ')'
+                    symbol "from"
+                    n <- name
+                    schar '='
+                    e <- expr
+                    symbol "end"
+                    return (Func i p n e)
+
+
+defops :: Parser ([Func], [ActOp])
+defops = token $ (>>>) funcs actops'
+         where funcs = many1 fundef
+               actops' = actops
+
+program :: Parser Program
+program = token $ defops
+                           
 
 parseString :: String -> Either Error Program
 parseString s = Left "Error bro"
@@ -159,6 +181,9 @@ testTxt5 = "(gisli,egils): send (#ok) to self _: send (#notok) to self"
 testTxt6 = "case jon of (gisli,egils): send (#ok) to self _: send (#notok) to self"
 
 testGate = "case message of (snd, sndmsg): if fst == #none then become #gate(snd,sndmsg) else send (fstmsg,sndmsg) to fst concat snd become #gate(#none, #none) end _: end"
+
+testFun = "let #printer () from message = send (message) to #println end"
+
 -- Right ([], [SendTo [Id "ok"] Self])
 
 --parseFile :: FilePath -> IO (Either Error Program)
