@@ -23,16 +23,16 @@ nameRest :: Parser Char
 nameRest = satisfy isAlpha <|> satisfy isDigit <|> satisfy (\x -> x == '_')
 
 name :: Parser Name
-name = do c <- letter
-          cs <- many nameRest
-          if (c:cs `elem` keyWords)
-             then reject
-             else return (c:cs)
+name = token $ do c <- letter
+                  cs <- many nameRest
+                  if (c:cs `elem` keyWords)
+                     then reject
+                     else return (c:cs)
 
 ident :: Parser Ident
-ident = do c <- satisfy (\x -> x == '#')
-           cs <- name
-           return cs
+ident = token $ do c <- satisfy (\x -> x == '#')
+                   cs <- name
+                   return cs
 
 -- A Prim parser that doesn't allow concatenation
 -- used in the Prim parser below to avoid loops when
@@ -95,7 +95,50 @@ actop = token $ sendTo <|> create <|> become
 actops :: Parser [ActOp]
 actops = token $ many actop
 
+someparams :: Parser [Name]
+someparams = token $ some
+             where some = do s <- name `sepBy1` (schar ',')
+                             return s
 
+parameters :: Parser [[Name]]
+parameters = token $ many someparams
+
+-- partial Expr parser
+expr :: Parser Expr
+expr = token $ case' <|> ifStm <|> acts
+        where case' = do symbol "case"
+                         p <- prim
+                         symbol "of"
+                         (c,e) <- cases
+                         symbol "end"
+                         return (CaseOf p c e) 
+              ifStm = do symbol "if"
+                         p1 <- prim
+                         symbol "=="
+                         p2 <- prim
+                         symbol "then"
+                         e1 <- expr
+                         symbol "else"
+                         e2 <- expr
+                         symbol "end"
+                         return (IfEq p1 p2 e1 e2)
+              acts = do a <- actops
+                        return (Acts a)
+              
+
+cases :: Parser ([([Name], Expr)], Expr)
+cases = token $ parCase <|> restCase
+        where parCase = do schar '('
+                           [n] <- parameters
+                           schar ')'
+                           schar ':'
+                           e1 <- expr
+                           (_,e2) <- cases
+                           return ([(n,e1)], e2) 
+              restCase = do schar '_'
+                            schar ':'
+                            e <- expr
+                            return ([], e)     
 
 
 
@@ -108,7 +151,14 @@ testTxt1 = "send (#ok) to self"
 testTxt2 = "send (#ok) to self create jon with gisli(yo,yo)"
 -- keyword test: should fail
 testTxt3 = "send (#create) to self"
+-- if test
+testTxt4 = "if fst == #none then send (#ok) to self else send (#notok) to self end"
 
+testTxt5 = "(gisli,egils): send (#ok) to self _: send (#notok) to self"
+
+testTxt6 = "case jon of (gisli,egils): send (#ok) to self _: send (#notok) to self"
+
+testGate = "case message of (snd, sndmsg): if fst == #none then become #gate(snd,sndmsg) else send (fstmsg,sndmsg) to fst concat snd become #gate(#none, #none) end _: end"
 -- Right ([], [SendTo [Id "ok"] Self])
 
 --parseFile :: FilePath -> IO (Either Error Program)
