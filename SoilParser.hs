@@ -157,7 +157,7 @@ fundef = token $ do symbol "let"
 
 defops :: Parser ([Func], [ActOp])
 defops = token $ (>>>) funcs actops'
-         where funcs = many1 fundef
+         where funcs = many fundef
                actops' = actops
 
 program :: Parser Program
@@ -165,7 +165,16 @@ program = token $ defops
                            
 
 parseString :: String -> Either Error Program
-parseString s = Left "Error bro"
+parseString s = case result of
+                     [] -> Left "ERROR"
+                     val -> Right (head $ val)
+                where result = parse' program s
+
+-- result 
+--             where result = 
+--                 case result of
+--                      [] -> Left "ERROR"
+--                      prog -> Right head $ prog 
 
 -- actop test
 testTxt1 = "send (#ok) to self"
