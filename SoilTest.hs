@@ -1,6 +1,10 @@
 import Test.HUnit
 import SoilParser
 import SoilAst
+import SoilInterp
+import SimpleParse
+
+import qualified Data.Map as M
 
 helloWorldString = "let #print() from message = \
 \  send (message) to #println\
@@ -50,6 +54,36 @@ cleanUpAst' = parseString cleanUpString
 parseCleanUpTest = TestCase $ assertBool "Testing parsing cleanUp.soil" $
                    Right cleanUpAst == cleanUpAst'
 
-tests = TestList [parseHelloWorldTest, parseCleanUpTest]
+lst = [("lol","#rofl"), ("jon","#gisli")]
+lstAdd = [("lol","#rofl"), ("jon","#gisli"), ("bobo", "#hobo")]
+
+mapz = NameEnv {mapping = M.fromList lst}
+mapzAdd = NameEnv {mapping = M.fromList lstAdd}
+
+nameInsertTest = TestCase $ assertBool "Testing NameEnv inserting" $
+                 Right mapzAdd == nameInsert "bobo" "#hobo" mapz
+
+nameLookupTest = TestCase $ assertBool "Testing NameEnv lookup" $
+                 Right "#rofl" == nameLookup "lol" mapz
+
+
+fun1 = head $ parse' fundef "let #printer () from message = send (message) to #println end"
+fun2 = head $ parse' fundef  "let #lolo(jon,gisli) from message = send (message,jon,gisli) to #println end"
+
+lzt = [("#gamli", fun1), ("#sosa", fun2)]
+lztAdd = [("#gamli", fun1), ("#sosa", fun2), ("#hehe",fun2)]
+
+mappo = FuncEnv {mappingf = M.fromList lzt}
+mappoAdd = FuncEnv {mappingf = M.fromList lztAdd}
+
+funcInsertTest = TestCase $ assertBool "Testing FuncEnv inserting" $
+                 Right mappoAdd == funcInsert "#hehe" fun2 mappo
+
+funcLookupTest = TestCase $ assertBool "Testing FuncEnv lookup" $
+                 Right fun1 == funcLookup "#gamli" mappo
+
+
+tests = TestList [parseHelloWorldTest, parseCleanUpTest, nameInsertTest,
+                  funcInsertTest, nameLookupTest, funcLookupTest]
 
 main = runTestTT tests

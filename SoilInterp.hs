@@ -16,7 +16,7 @@ import Data.Maybe
 -- Part 1: Define a name environment
 --
 data NameEnv = NameEnv {mapping :: (M.Map Name Ident)}
-             deriving(Show)
+             deriving(Show, Eq)
 
 -- Functions for insert and lookup
 
@@ -32,15 +32,11 @@ nameLookup n env = case look of
                     val     -> Right (fromMaybe "" val)
                where look = M.lookup n (mapping env)
 
-                      
-lst = [("lol","#rofl"), ("jon","#gisli")]
-mapz = NameEnv {mapping = M.fromList lst}
-
 --
 -- Part 2: Define a function environment
 --
 data FuncEnv = FuncEnv {mappingf :: (M.Map Ident Func)}
-             deriving(Show)
+             deriving(Show, Eq)
 
 -- Functions for insert and lookup
 
@@ -56,10 +52,6 @@ funcLookup i env = case look of
                     Just val -> Right val 
                where look = M.lookup i (mappingf env)
 
-fun1 = head $ parse' fundef "let #printer () from message = send (message) to #println end"
-fun2 = head $ parse' fundef  "let #lolo(jon,gisli) from message = send (message,jon,gisli) to #println end"
-lzt = [("#gamli", fun1),("#sosa", fun2)]
-mappo = FuncEnv {mappingf = M.fromList lzt}
 
 --
 -- Part 3: Degine a process and process queue
