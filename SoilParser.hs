@@ -51,11 +51,6 @@ prim' = self <|> name' <|> ident'
              name' = do n <- name
                         return (Par n)
 
--- concat' :: Parser Prim
--- concat' = do p1 <- prim
---              symbol "concat"
---              p2 <- prim'
---              return (Concat p1 p2)
 
 prim :: Parser Prim
 prim = self <|> name' <|> ident' <|> concat
@@ -65,9 +60,7 @@ prim = self <|> name' <|> ident' <|> concat
                          return (Id i)
              name' = do n <- name
                         return (Par n)
-             -- concat = concat'
              concat = chainl1 prim' (symbol "concat" >> return Concat)
-             -- expr = chainl1 prim (char ’+’ >> return Add)
 
 someArgs :: Parser [Prim]
 someArgs = do p  <- prim `sepBy1` (schar ',')
