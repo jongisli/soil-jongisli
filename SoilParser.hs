@@ -9,6 +9,11 @@ import SimpleParse
 import SoilAst
 import Data.Char(isSpace,isLower,isUpper,isDigit,isAlpha,isAlphaNum)
 
+import System.IO
+import Control.Exception.Base
+
+type Error = String
+
 keyWords = ["self", "to", "create", "with", "become", 
             "let", "from", "case", "send", "concat",
             "if", "then", "else", "end"]
@@ -30,15 +35,15 @@ name = token $ do c <- letter
                      else return (c:cs)
 
 ident :: Parser Ident
-ident = token $ do c <- satisfy (\x -> x == '#')
-                   cs <- name
-                   return cs
+ident = do schar '#'
+           n <- name
+           return n
 
 -- A Prim parser that doesn't allow concatenation
 -- used in the Prim parser below to avoid loops when
 -- concatenating.
 prim' :: Parser Prim
-prim' = token $ self <|> name' <|> ident'
+prim' = self <|> name' <|> ident'
        where self = do symbol "self"
                        return Self
              ident' = do i <- ident
@@ -46,36 +51,43 @@ prim' = token $ self <|> name' <|> ident'
              name' = do n <- name
                         return (Par n)
 
+-- concat' :: Parser Prim
+-- concat' = do p1 <- prim
+--              symbol "concat"
+--              p2 <- prim'
+--              return (Concat p1 p2)
+
 prim :: Parser Prim
-prim = token $ self <|> name' <|> ident' <|> concat
+prim = self <|> name' <|> ident' <|> concat
        where self = do symbol "self"
                        return Self
              ident' = do i <- ident
                          return (Id i)
              name' = do n <- name
                         return (Par n)
+             -- concat = concat'
              concat = chainl1 prim' (symbol "concat" >> return Concat)
              -- expr = chainl1 prim (char ’+’ >> return Add)
 
 someArgs :: Parser [Prim]
-someArgs = token $ do p  <- prim `sepBy1` (schar ',')
-                      return p
+someArgs = do p  <- prim `sepBy1` (schar ',')
+              return p
 
 args :: Parser [Prim]
-args = token $ someArgs' <|> emptyList
+args = someArgs' <|> emptyList
        where someArgs' = do a <- someArgs
                             return a
              emptyList = return []
 
 fcall :: Parser (Prim, [Prim])
-fcall = token $ do p <- prim
-                   schar '('
-                   a <- args
-                   schar ')'
-                   return (p,a)
+fcall = do p <- prim
+           schar '('
+           a <- args
+           schar ')'
+           return (p,a)
 
 actop :: Parser ActOp
-actop = token $ sendTo <|> create <|> become
+actop = sendTo <|> create <|> become
         where sendTo = do symbol "send"
                           schar '('
                           a <- args
@@ -93,19 +105,18 @@ actop = token $ sendTo <|> create <|> become
                           return (Become a as)
 
 actops :: Parser [ActOp]
-actops = token $ many actop
+actops = many actop
 
 someparams :: Parser [Name]
-someparams = token $ some
-             where some = do s <- name `sepBy` (schar ',')
-                             return s
+someparams = do s <- name `sepBy` (schar ',')
+                return s
 
 parameters :: Parser [Name]
-parameters = token $ someparams
+parameters = someparams
 
 
 expr :: Parser Expr
-expr = token $ case' <|> ifStm <|> acts
+expr =  case' <|> ifStm <|> acts
         where case' = do symbol "case"
                          p <- prim
                          symbol "of"
@@ -127,7 +138,7 @@ expr = token $ case' <|> ifStm <|> acts
               
 
 cases :: Parser ([([Name], Expr)], Expr)
-cases = token $ parCase <|> restCase
+cases = parCase <|> restCase
         where parCase = do schar '('
                            n <- parameters
                            schar ')'
@@ -142,26 +153,25 @@ cases = token $ parCase <|> restCase
 
 
 fundef :: Parser Func
-fundef = token $ do symbol "let"
-                    i <- ident
-                    schar '('
-                    p <- parameters
-                    schar ')'
-                    symbol "from"
-                    n <- name
-                    schar '='
-                    e <- expr
-                    symbol "end"
-                    return (Func i p n e)
+fundef = do symbol "let"
+            i <- ident
+            schar '('
+            p <- parameters
+            schar ')'
+            symbol "from"
+            n <- name
+            schar '='
+            e <- expr
+            symbol "end"
+            return (Func i p n e)
 
 
 defops :: Parser ([Func], [ActOp])
-defops = token $ (>>>) funcs actops'
-         where funcs = many fundef
-               actops' = actops
+defops = (many fundef) >>> actops
+
 
 program :: Parser Program
-program = token $ defops
+program = defops
                            
 
 parseString :: String -> Either Error Program
@@ -170,29 +180,10 @@ parseString s = case result of
                      val -> Right (head $ val)
                 where result = parse' program s
 
--- result 
---             where result = 
---                 case result of
---                      [] -> Left "ERROR"
---                      prog -> Right head $ prog 
+parseFile :: FilePath -> IO (Either Error Program)
+parseFile f = do  
+    handle <- openFile f ReadMode  
+    contents <- hGetContents handle
+    return (parseString contents)
+    
 
--- actop test
-testTxt1 = "send (#ok) to self"
--- actops test
-testTxt2 = "send (#ok) to self create jon with gisli(yo,yo)"
--- keyword test: should fail
-testTxt3 = "send (#create) to self"
--- if test
-testTxt4 = "if fst == #none then send (#ok) to self else send (#notok) to self end"
-
-testTxt5 = "(gisli,egils): send (#ok) to self _: send (#notok) to self"
-
-testTxt6 = "case jon of (gisli,egils): send (#ok) to self _: send (#notok) to self"
-
-testGate = "case message of (snd, sndmsg): if fst == #none then become #gate(snd,sndmsg) else send (fstmsg,sndmsg) to fst concat snd become #gate(#none, #none) end _: end"
-
-testFun = "let #printer () from message = send (message) to #println end"
-
--- Right ([], [SendTo [Id "ok"] Self])
-
---parseFile :: FilePath -> IO (Either Error Program)

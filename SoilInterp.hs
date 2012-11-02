@@ -70,7 +70,7 @@ data Process = Process { function  :: Ident
                        , arguments :: [Ident]
                        , mailbox   :: [Message]}
 
-data ProcessQueue = ... 
+data ProcessQueue = String
 
 -- Function for process modification
 

@@ -31,5 +31,3 @@ data Prim     = Id Ident
               | Self
               | Concat Prim Prim
               deriving (Eq, Show)
-
-type Error    = String
