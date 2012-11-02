@@ -98,7 +98,7 @@ actop = sendTo <|> create <|> become
                           return (Become a as)
 
 actops :: Parser [ActOp]
-actops = many actop
+actops = many actop 
 
 someparams :: Parser [Name]
 someparams = do s <- name `sepBy` (schar ',')
@@ -160,7 +160,9 @@ fundef = do symbol "let"
 
 
 defops :: Parser ([Func], [ActOp])
-defops = (many fundef) >>> actops
+defops = do f <- many fundef
+            a <- actops
+            return (f,a)
 
 
 program :: Parser Program
@@ -172,6 +174,7 @@ parseString s = case result of
                      [] -> Left "ERROR"
                      val -> Right (head $ val)
                 where result = parse' program s
+
 
 parseFile :: FilePath -> IO (Either Error Program)
 parseFile f = do  
